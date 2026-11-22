@@ -2,7 +2,7 @@
 
 Omarchy 4.5 (Quattro RS, tag `v4.5.0`) installé dans le home, sur Fedora.
 
-Le dépôt contient le delta Fedora et `install.sh`. Il ne contient pas la configuration de la machine : écrans, clavier, raccourcis, barre, plugins, thèmes perso.
+Le dépôt contient le delta Fedora, `install.sh`, et quatre réglages de session : écrans, clavier, pavé, Super+B, OCR `fra+eng`.
 
 Upstream reste [omacom/omarchy](https://github.com/omacom/omarchy). `install.sh` télécharge le tag, vérifie `SHA256SUMS`, copie `bin`, `config`, `default`, `shell`, `themes`, puis pose `overlay/`.
 
@@ -18,12 +18,18 @@ Upstream reste [omacom/omarchy](https://github.com/omacom/omarchy). `install.sh`
 
 L'arbre arrive dans `~/.local/share/omarchy`. Un arbre déjà là est renommé `omarchy.bak.<date>`.
 
-Le script ne remplace pas un fichier déjà présent sous `~/.config`. `--skip-packages` ne relance pas `dnf`.
+`--skip-packages` ne relance pas `dnf`.
 
-Sur une machine vide, il pose seulement :
+À chaque exécution, le script réécrit :
+
+- `~/.config/hypr/monitors.lua` — `eDP-1` en 1080p, échelle 1, `HDMI-A-1` en miroir
+- `~/.config/hypr/input.lua` — compose sur Ctrl droit, pavé sans défilement naturel
+- `~/.config/hypr/bindings.lua` — Super+B ouvre le navigateur
+- `~/.config/hypr/autostart.lua` — OCR `fra+eng`
+
+S'ils manquent, il pose aussi :
 
 - `~/.config/hypr/hyprland.lua` (chemin de l'arbre, puis les défauts Omarchy)
-- les modèles Hyprland upstream, s'ils manquent (`monitors.lua`, `input.lua`, …)
 - `~/.config/environment.d/gtk-im-module.conf` (`GTK_IM_MODULE=simple`)
 - `~/.config/systemd/user/hyprland-session.service` (portails sous GDM, sans UWSM)
 - `~/.config/xdg-terminals.list` (Ghostty)
@@ -32,12 +38,13 @@ La session en cours ne recharge pas Hyprland. Une nouvelle connexion prend l'aut
 
 ## Ce qui reste sur la machine
 
-- `~/.config/hypr/` une fois qu'il existe (écrans, clavier, raccourcis, règles de fenêtres)
 - `~/.config/omarchy/shell.json`
 - `~/.config/omarchy/plugins/`
 - `~/.config/omarchy/branding/`
-Brave, les règles de fenêtres et le plugin XMR ne sont pas des paquets du socle.
+- les règles Promethee, jeux et veille navigateur (`promethee.lua`, `games.lua`, `browser.lua`)
+
+Brave n'est pas un paquet du socle. Super+B lance le navigateur par défaut d'Omarchy.
 
 `power-profiles-daemon` et TLP ne doivent pas être installés à côté de `tuned`. Le script s'arrête s'il les trouve.
 
-OCR : si tu veux `fra+eng`, mets `hl.env("OMARCHY_OCR_LANGS", "fra+eng")` dans ton `~/.config/hypr/autostart.lua`. Ce n'est pas dans le dépôt.
+Une nouvelle connexion charge les fichiers Hyprland. La session déjà ouverte garde l'ancienne config jusqu'au prochain login.

@@ -134,13 +134,21 @@ install_if_missing() {
 }
 
 # Upstream stubs, only where the user has no file yet.
-for name in autostart.lua bindings.lua input.lua looknfeel.lua monitors.lua xdph.conf hyprsunset.conf; do
+for name in looknfeel.lua xdph.conf hyprsunset.conf; do
   if [[ -f $dest/config/hypr/$name ]]; then
     install_if_missing "$dest/config/hypr/$name" "$HOME/.config/hypr/$name" 644
   fi
 done
 
 install_if_missing "$root/home/config/hypr/hyprland.lua" "$HOME/.config/hypr/hyprland.lua" 644
+
+# Screens, keyboard, trackpad, Super+B and OCR. Re-running resets these four.
+for name in monitors.lua input.lua bindings.lua autostart.lua; do
+  mkdir -p "$HOME/.config/hypr"
+  cp -a "$root/home/config/hypr/$name" "$HOME/.config/hypr/$name"
+  chmod 644 "$HOME/.config/hypr/$name"
+  printf 'config %s\n' "$HOME/.config/hypr/$name"
+done
 install_if_missing "$root/home/config/environment.d/gtk-im-module.conf" "$HOME/.config/environment.d/gtk-im-module.conf" 644
 install_if_missing "$root/home/config/systemd/user/hyprland-session.service" "$HOME/.config/systemd/user/hyprland-session.service" 644
 install_if_missing "$root/home/config/xdg-terminals.list" "$HOME/.config/xdg-terminals.list" 644
