@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# omarchy:summary=Watch a directory for plugin changes
+# omarchy:args=<directory>
+
+# Fedora may not have inotify-tools. Block instead of exiting so Quickshell
+# does not restart this process every second.
+dir=${1:-}
+if command -v inotifywait >/dev/null 2>&1; then
+  exec inotifywait -m -r -q -e close_write,create,delete,move --format '%w%f' "$dir"
+fi
+exec sleep infinity

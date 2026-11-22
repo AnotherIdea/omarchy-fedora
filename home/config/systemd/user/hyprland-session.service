@@ -1,0 +1,18 @@
+[Unit]
+Description=Hyprland graphical session (GDM without UWSM)
+Documentation=man:systemd.special(7)
+# graphical-session.target has RefuseManualStart=yes. Pull it in as a
+# dependency so xdg-desktop-portal's Requisite is satisfied. Empty
+# Requisite= in a drop-in does not clear the vendor value on systemd 259.
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target
+Wants=graphical-session.target
+Before=graphical-session.target
+Wants=xdg-desktop-portal.service
+Wants=xdg-desktop-portal-hyprland.service
+Wants=xdg-desktop-portal-gtk.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true

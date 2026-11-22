@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# omarchy:summary=Returns a list of all the available power profiles on the system.
+# omarchy:args=[--active-state]
+
+if [[ ${1:-} != "" && ${1:-} != "--active-state" ]]; then
+  echo "Usage: omarchy-powerprofiles-list [--active-state]" >&2
+  exit 1
+fi
+
+with_state="${1:+1}"
+
+list_from_ctl() {
+  powerprofilesctl list 2>/dev/null |
+    awk -v with_state="$with_state" '/^\s*[* ]\s*[a-zA-Z0-9-]+:$/ {
+      active = ($1 == "*") ? 1 : 0
+      gsub(/^[*[:space:]]+|:$/, "")
+      print $0 (with_state ? "\t" active : "")
+    }' |
+    tac
+}
+
+# Fedora keeps tuned + tuned-ppd instead of power-profiles-daemon. The PPD
+# D-Bus API is the same; powerprofilesctl is just not installed.
+ppd_get() {
+  local prop=$1
+  busctl get-property org.freedesktop.UPower.PowerProfiles \
+    /org/freedesktop/UPower/PowerProfiles \
+    org.freedesktop.UPower.PowerProfiles "$prop" 2>/dev/null && return 0
+  busctl get-property net.hadess.PowerProfiles \
+    /net/hadess/PowerProfiles \
+    net.hadess.PowerProfiles "$prop" 2>/dev/null
+}
+
+list_from_dbus() {
+  local active profiles_raw name
+  active=$(ppd_get ActiveProfile | awk -F'"' '{print $2}')
+  [[ -n $active ]] || return 1
+  profiles_raw=$(ppd_get Profiles) || return 1
+
+  while read -r name; do
+    [[ -z $name ]] && continue
+    if [[ -n $with_state ]]; then
+      if [[ $name == "$active" ]]; then
+        printf '%s\t1\n' "$name"
+      else
+        printf '%s\t0\n' "$name"
+      fi
+    else
+      printf '%s\n' "$name"
+    fi
+  done < <(grep -oE '"Profile" s "[^"]+"' <<<"$profiles_raw" | awk -F'"' '{print $4}')
+}
+
+if command -v powerprofilesctl >/dev/null 2>&1; then
+  if out=$(list_from_ctl) && [[ -n $out ]]; then
+    printf '%s\n' "$out"
+    exit 0
+  fi
+fi
+
+list_from_dbus
