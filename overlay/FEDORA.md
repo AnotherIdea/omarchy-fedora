@@ -16,6 +16,6 @@ Fedora changes in this tree:
 - The keyboard-layout widget skips `xkbcli` when that binary is absent.
 - The power-profile menu reads the active profile from `omarchy-powerprofiles-list`.
 
-`ttfx` and `socat` are not part of this overlay. An upgrade keeps the copies already in `bin/`.
+`socat` is the Fedora package. `ttfx` 0.5.0-3 is downloaded by `install.sh` into `bin/` (no Fedora package). `power-profiles-daemon` and TLP are refused.
 
 Personal files stay on the machine. `install.sh` does not overwrite them: monitors, input, bindings, local autostart, shell.json, plugins, branding.

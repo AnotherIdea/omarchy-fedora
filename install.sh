@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Install Omarchy at the pinned tag, then the Fedora overlay.
-# No sudo. Existing personal config under ~/.config is left in place.
+# Install Omarchy at the pinned tag, the Fedora packages, then the overlay.
+# Package install asks for sudo. Existing personal config under ~/.config is left in place.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")" && pwd)
@@ -9,34 +9,73 @@ dest=${OMARCHY_PATH:-$HOME/.local/share/omarchy}
 cache=${XDG_CACHE_HOME:-$HOME/.cache}/omarchy-fedora
 tarball=$cache/omarchy-$tag.tar.gz
 url=https://codeload.github.com/omacom/omarchy/tar.gz/refs/tags/$tag
+ttfx_name=ttfx-0.5.0-3-x86_64.pkg.tar.zst
+ttfx_url=https://pkgs.omarchy.org/stable/x86_64/$ttfx_name
 tree_only=0
+skip_packages=0
 
-if [[ ${1:-} == --tree-only ]]; then
-  tree_only=1
-elif [[ -n ${1:-} ]]; then
-  echo "Usage: install.sh [--tree-only]" >&2
-  exit 2
-fi
+case ${1:-} in
+  "") ;;
+  --tree-only) tree_only=1 ;;
+  --skip-packages) skip_packages=1 ;;
+  *)
+    echo "Usage: install.sh [--tree-only | --skip-packages]" >&2
+    exit 2
+    ;;
+esac
+
+as_root() {
+  if [[ ${EUID} -eq 0 ]]; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
+checksum() {
+  local file=$1 name=$2
+  awk -v file="$name" '$2 == file { print $1; exit }' "$root/SHA256SUMS"
+}
+
+fetch() {
+  local dest_file=$1 src_url=$2 name=$3
+  local expected
+  expected=$(checksum "$dest_file" "$name")
+  [[ -n $expected ]] || {
+    echo "No checksum for $name" >&2
+    exit 1
+  }
+  if [[ ! -f $dest_file ]] || [[ $(sha256sum "$dest_file" | awk '{ print $1 }') != "$expected" ]]; then
+    curl -fsSL -o "$dest_file.partial" "$src_url"
+    mv "$dest_file.partial" "$dest_file"
+  fi
+  [[ $(sha256sum "$dest_file" | awk '{ print $1 }') == "$expected" ]] || {
+    echo "Checksum mismatch for $dest_file" >&2
+    exit 1
+  }
+}
+
+install_packages() {
+  local pkg pkgs=()
+  if rpm -q power-profiles-daemon >/dev/null 2>&1 || rpm -q tlp >/dev/null 2>&1; then
+    echo "Remove power-profiles-daemon and tlp first. tuned-ppd cannot sit next to them." >&2
+    exit 1
+  fi
+  while read -r pkg; do
+    [[ -z $pkg || $pkg == \#* ]] && continue
+    pkgs+=("$pkg")
+  done <"$root/packages.txt"
+  as_root dnf install -y dnf5-plugins
+  as_root dnf -y copr enable lionheartp/Hyprland
+  as_root dnf -y copr enable scottames/ghostty
+  as_root dnf install -y "${pkgs[@]}"
+}
 
 mkdir -p "$cache"
-expected=$(awk -v file="omarchy-$tag.tar.gz" '$2 == file { print $1; exit }' "$root/SHA256SUMS")
-[[ -n $expected ]] || {
-  echo "No checksum for omarchy-$tag.tar.gz" >&2
-  exit 1
-}
-
-have_hash() {
-  sha256sum "$tarball" | awk '{ print $1 }'
-}
-
-if [[ ! -f $tarball ]] || [[ $(have_hash) != "$expected" ]]; then
-  curl -fsSL -o "$tarball.partial" "$url"
-  mv "$tarball.partial" "$tarball"
+if (( tree_only == 0 && skip_packages == 0 )); then
+  install_packages
 fi
-[[ $(have_hash) == "$expected" ]] || {
-  echo "Checksum mismatch for $tarball" >&2
-  exit 1
-}
+fetch "$tarball" "$url" "omarchy-$tag.tar.gz"
 
 stage=$(mktemp -d)
 cleanup() { rm -rf "$stage"; }
@@ -56,14 +95,7 @@ chmod 755 "$work/bin/omarchy-inotifywait" \
   "$work/bin/omarchy-powerprofiles-set" \
   "$work/bin/omarchy-system"
 
-# Screensaver binaries are not in this repo. Keep the ones already installed.
-if [[ -d $dest/bin ]]; then
-  for bin in ttfx socat; do
-    if [[ -f $dest/bin/$bin && ! -e $work/bin/$bin ]]; then
-      cp -a "$dest/bin/$bin" "$work/bin/$bin"
-    fi
-  done
-fi
+# socat comes from the Fedora package. A copy in this tree would hide /usr/bin/socat.
 
 backup=""
 if [[ -e $dest ]]; then
@@ -117,15 +149,19 @@ if [[ -f $HOME/.config/systemd/user/hyprland-session.service ]]; then
   systemctl --user daemon-reload
 fi
 
+ttfx_pkg=$cache/$ttfx_name
+fetch "$ttfx_pkg" "$ttfx_url" "$ttfx_name"
+ttfx_stage=$(mktemp -d)
+tar -C "$ttfx_stage" -xf "$ttfx_pkg" usr/bin/ttfx
+install -m 755 "$ttfx_stage/usr/bin/ttfx" "$dest/bin/ttfx"
+rm -rf "$ttfx_stage"
 mkdir -p "$HOME/.local/bin"
-for bin in ttfx socat; do
-  if [[ -f $dest/bin/$bin ]]; then
-    ln -sfn "$dest/bin/$bin" "$HOME/.local/bin/$bin"
-  fi
-done
+ln -sfn "$dest/bin/ttfx" "$HOME/.local/bin/ttfx"
+# The old private socat hid /usr/bin/socat. Drop that link once the package is there.
+if [[ -L $HOME/.local/bin/socat && -x /usr/bin/socat ]]; then
+  rm -f "$HOME/.local/bin/socat"
+fi
 
 printf 'tree %s\n' "$dest"
 [[ -n $backup ]] && printf 'backup %s\n' "$backup"
-if [[ ! -x $dest/bin/ttfx || ! -x $dest/bin/socat ]]; then
-  echo "Screensaver still needs ttfx and socat in $dest/bin. This repo does not ship those binaries." >&2
-fi
+command -v socat >/dev/null 2>&1 || echo "socat is not on PATH. Re-run without --skip-packages." >&2

@@ -1,0 +1,36 @@
+# Session stack for Omarchy 4.5 on Fedora.
+# hyprland, quickshell, uwsm and xdg-desktop-portal-hyprland come from
+# copr:lionheartp/Hyprland. ghostty comes from copr:scottames/ghostty.
+# Fedora's own quickshell is 0.2 and cannot run this shell.
+# Do not add power-profiles-daemon or tlp. tuned-ppd owns the power profiles.
+
+hyprland
+quickshell
+uwsm
+xdg-desktop-portal-hyprland
+ghostty
+
+xdg-terminal-exec
+libxkbcommon-utils
+inotify-tools
+socat
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+tuned
+tuned-ppd
+jq
+curl
+python3
+wl-clipboard
+brightnessctl
+playerctl
+wireplumber
+pipewire
+grim
+slurp
+tesseract
+tesseract-langpack-eng
+tesseract-langpack-fra
+zbar
+nautilus
+dnf5-plugins
